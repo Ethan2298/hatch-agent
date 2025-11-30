@@ -1,0 +1,174 @@
+"""
+System Stress Test
+Tests CPU, memory, and disk performance to see how your system handles heavy loads.
+Shows real-time stats and creates a performance report.
+"""
+
+import sys
+import time
+import psutil
+import threading
+import multiprocessing
+from datetime import datetime
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+
+print("🔥 SYSTEM STRESS TEST")
+print("=" * 50)
+
+# Get initial system stats
+print("\n📊 Initial System Stats:")
+print(f"  CPU Cores: {multiprocessing.cpu_count()}")
+print(f"  CPU Usage: {psutil.cpu_percent()}%")
+print(f"  Memory: {psutil.virtual_memory().percent}% used")
+print(f"  Available RAM: {psutil.virtual_memory().available / (1024**3):.2f} GB")
+
+def cpu_stress(duration=10):
+    """Stress test the CPU"""
+    print(f"\n🔥 CPU Stress Test ({duration} seconds)...")
+    end_time = time.time() + duration
+
+    def worker():
+        while time.time() < end_time:
+            # Heavy computation
+            sum([i**2 for i in range(10000)])
+
+    # Create threads for each CPU core
+    threads = []
+    for _ in range(multiprocessing.cpu_count()):
+        t = threading.Thread(target=worker)
+        t.start()
+        threads.append(t)
+
+    # Monitor CPU usage
+    start_usage = psutil.cpu_percent()
+    time.sleep(1)
+    peak_usage = 0
+
+    while time.time() < end_time:
+        current = psutil.cpu_percent(interval=1)
+        peak_usage = max(peak_usage, current)
+        print(f"  CPU: {current}% | Memory: {psutil.virtual_memory().percent}%", end='\r')
+
+    # Wait for threads to finish
+    for t in threads:
+        t.join()
+
+    print(f"\n  ✅ Peak CPU Usage: {peak_usage}%")
+    return peak_usage
+
+def memory_stress(size_mb=500, duration=5):
+    """Stress test memory"""
+    print(f"\n💾 Memory Stress Test (allocating {size_mb}MB for {duration} seconds)...")
+
+    start_mem = psutil.virtual_memory().percent
+
+    # Allocate memory
+    data = []
+    chunk_size = 1024 * 1024  # 1MB chunks
+    for i in range(size_mb):
+        data.append(bytearray(chunk_size))
+        if i % 100 == 0:
+            current_mem = psutil.virtual_memory().percent
+            print(f"  Allocated: {i}MB | Memory: {current_mem}%", end='\r')
+
+    peak_mem = psutil.virtual_memory().percent
+    print(f"\n  ✅ Peak Memory Usage: {peak_mem}%")
+
+    time.sleep(duration)
+
+    # Clear memory
+    data.clear()
+    return peak_mem
+
+def disk_stress(iterations=100):
+    """Stress test disk I/O"""
+    print(f"\n💿 Disk I/O Test ({iterations} write/read operations)...")
+
+    test_file = "stress_test_temp.dat"
+    data_size = 1024 * 1024  # 1MB
+    test_data = bytearray(data_size)
+
+    start_time = time.time()
+
+    # Write test
+    for i in range(iterations):
+        with open(test_file, 'wb') as f:
+            f.write(test_data)
+        if i % 10 == 0:
+            print(f"  Progress: {i}/{iterations}", end='\r')
+
+    write_time = time.time() - start_time
+
+    # Read test
+    start_time = time.time()
+    for i in range(iterations):
+        with open(test_file, 'rb') as f:
+            _ = f.read()
+
+    read_time = time.time() - start_time
+
+    # Clean up
+    import os
+    os.remove(test_file)
+
+    write_speed = (data_size * iterations / (1024**2)) / write_time
+    read_speed = (data_size * iterations / (1024**2)) / read_time
+
+    print(f"\n  ✅ Write Speed: {write_speed:.2f} MB/s")
+    print(f"  ✅ Read Speed: {read_speed:.2f} MB/s")
+
+    return write_speed, read_speed
+
+# Run the stress tests
+print("\n" + "=" * 50)
+print("🚀 Starting Stress Tests...")
+print("=" * 50)
+
+try:
+    results = {}
+
+    # CPU Test
+    results['cpu_peak'] = cpu_stress(duration=10)
+    time.sleep(2)
+
+    # Memory Test
+    results['mem_peak'] = memory_stress(size_mb=500, duration=5)
+    time.sleep(2)
+
+    # Disk Test
+    results['disk_write'], results['disk_read'] = disk_stress(iterations=100)
+
+    # Final Report
+    print("\n" + "=" * 50)
+    print("📋 FINAL REPORT")
+    print("=" * 50)
+    print(f"⏰ Test completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"\n🔥 CPU Performance:")
+    print(f"  Peak Usage: {results['cpu_peak']}%")
+    print(f"\n💾 Memory Performance:")
+    print(f"  Peak Usage: {results['mem_peak']}%")
+    print(f"\n💿 Disk Performance:")
+    print(f"  Write Speed: {results['disk_write']:.2f} MB/s")
+    print(f"  Read Speed: {results['disk_read']:.2f} MB/s")
+
+    # Save report
+    report_file = f"stress_test_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    with open(report_file, 'w') as f:
+        f.write("SYSTEM STRESS TEST REPORT\n")
+        f.write("=" * 50 + "\n")
+        f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        f.write(f"CPU Peak Usage: {results['cpu_peak']}%\n")
+        f.write(f"Memory Peak Usage: {results['mem_peak']}%\n")
+        f.write(f"Disk Write Speed: {results['disk_write']:.2f} MB/s\n")
+        f.write(f"Disk Read Speed: {results['disk_read']:.2f} MB/s\n")
+
+    print(f"\n💾 Report saved to: {report_file}")
+    print("\n✅ All tests completed successfully!")
+
+except KeyboardInterrupt:
+    print("\n\n⚠️  Test interrupted by user")
+except Exception as e:
+    print(f"\n\n❌ Error during testing: {e}")

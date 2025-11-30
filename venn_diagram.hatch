@@ -1,0 +1,49 @@
+"""
+Venn Diagram Generator
+Creates a beautiful Venn diagram showing overlapping sets of data.
+This example shows people who like different types of entertainment.
+"""
+
+import matplotlib.pyplot as plt
+from matplotlib_venn import venn3, venn3_circles
+import sys
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8')
+
+print("🎨 Creating Venn Diagram...")
+
+# Example data: People and their interests
+set_movies = {"Alice", "Bob", "Charlie", "Diana", "Eve"}
+set_books = {"Bob", "Charlie", "Frank", "Grace", "Diana"}
+set_games = {"Charlie", "Diana", "Henry", "Alice", "Iris"}
+
+print(f"\n📊 Data:")
+print(f"  Movies fans: {set_movies}")
+print(f"  Books fans: {set_books}")
+print(f"  Games fans: {set_games}")
+
+# Create the Venn diagram
+plt.figure(figsize=(10, 8))
+
+# Draw the Venn diagram
+v = venn3([set_movies, set_books, set_games],
+          set_labels=('Movie Lovers', 'Book Lovers', 'Game Lovers'),
+          set_colors=('lightcoral', 'lightskyblue', 'lightgreen'),
+          alpha=0.7)
+
+# Add circles around the sets
+venn3_circles([set_movies, set_books, set_games], linewidth=2)
+
+# Customize the appearance
+plt.title("Entertainment Preferences - Venn Diagram", fontsize=16, fontweight='bold', pad=20)
+
+# Save the diagram
+output_file = "venn_diagram.png"
+plt.savefig(output_file, dpi=300, bbox_inches='tight')
+print(f"\n✅ Venn diagram saved as: {output_file}")
+
+# Show the diagram
+plt.show()
+print("🖼️  Diagram displayed! Close the window to exit.")
