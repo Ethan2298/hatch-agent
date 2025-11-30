@@ -1,0 +1,141 @@
+"""
+ASCII Art Generator
+This script creates fun ASCII art designs for you!
+"""
+
+import sys
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+def print_banner():
+    """Print a welcome banner"""
+    banner = """
+    +==========================================================+
+    |                  ASCII ART GALLERY                       |
+    +==========================================================+
+    """
+    print(banner)
+
+def print_rocket():
+    """Print a rocket ship"""
+    rocket = """
+           /\\
+          /  \\
+         |    |
+         |NASA|
+        /|    |\\
+       / |    | \\
+      /  |    |  \\
+     |   |    |   |
+     |___|____|___|
+        /|    |\\
+       / |    | \\
+      /  |    |  \\
+     |___|____|___|
+       /  ||  \\
+      /___||___\\
+         /  \\
+        /____\\
+       /||||||\\
+      /_||||||_\\
+    """
+    print(rocket)
+
+def print_cat():
+    """Print a cute cat"""
+    cat = """
+     /\\_/\\
+    ( o.o )
+     > ^ <
+    /|   |\\
+   (_|   |_)
+    """
+    print(cat)
+
+def print_dragon():
+    """Print a dragon"""
+    dragon = """
+                         ___====-_  _-====___
+                   _--^^^#####//      \\\\#####^^^--_
+                _-^##########// (    ) \\\\##########^-_
+               -############//  |\\^^/|  \\\\############-
+             _/############//   (@::@)   \\\\############\\_
+            /#############((     \\\\//     ))#############\\
+           -###############\\\\    (oo)    //###############-
+          -#################\\\\  / VV \\  //#################-
+         -###################\\\\/      \\//###################-
+        _#/|##########/\\######(   /\\   )######/\\##########|\\#_
+        |/ |#/\\#/\\#/\\/  \\#/\\##\\  |  |  /##/\\#/  \\/\\#/\\#/\\#| \\|
+        `  |/  V  V  `   V  \\#\\| |  | |/#/  V   '  V  V  \\|  '
+           `   `  `      `   / | |  | | \\   '      '  '   '
+    """
+    print(dragon)
+
+def print_happy_face():
+    """Print a happy face"""
+    face = """
+        #####
+      ##     ##
+     #  O   O  #
+    #     <     #
+    #   \\___/   #
+     #         #
+      ##     ##
+        #####
+    """
+    print(face)
+
+def print_computer():
+    """Print a computer"""
+    computer = """
+     ___________________
+    |  _____________  |
+    | |             | |
+    | | Hatch  v1.0 | |
+    | |   > Ready_  | |
+    | |_____________| |
+    |_________________|
+        _[_______]_
+    ___[___________]___
+   |         [_____] []|
+   |         [_____] []|
+   L___________________J
+    """
+    print(computer)
+
+def main():
+    print_banner()
+    print("\n🎨 Generating ASCII Art for you...\n")
+
+    print("\n" + "="*60)
+    print("🚀 ROCKET SHIP")
+    print("="*60)
+    print_rocket()
+
+    print("\n" + "="*60)
+    print("🐱 CUTE CAT")
+    print("="*60)
+    print_cat()
+
+    print("\n" + "="*60)
+    print("😊 HAPPY FACE")
+    print("="*60)
+    print_happy_face()
+
+    print("\n" + "="*60)
+    print("💻 COMPUTER")
+    print("="*60)
+    print_computer()
+
+    print("\n" + "="*60)
+    print("🐉 DRAGON")
+    print("="*60)
+    print_dragon()
+
+    print("\n✨ ASCII Art generation complete! ✨\n")
+
+if __name__ == "__main__":
+    main()

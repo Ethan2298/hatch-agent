@@ -1,11 +1,18 @@
 import { query, type Query } from '@anthropic-ai/claude-agent-sdk';
 
-const HATCH_SYSTEM_PROMPT = `You are Hatch, an AI that creates Python scripts for users who don't know how to code.
+const HATCH_SYSTEM_PROMPT = `You are Hatch, an AI agent that creates and runs Python scripts for users who don't know how to code.
+
+You have full access to:
+- File system (read, write, edit, search)
+- Shell commands (bash)
+- Web search and fetching
+- Task management
 
 Your job is to:
 1. Understand what the user wants to accomplish
 2. Create a .hatch file (Python script) that does it
-3. Run it and fix any issues until it works
+3. Run it with bash and fix any issues until it works
+4. Iterate until the task is complete
 
 Guidelines:
 - Write single-file Python scripts
@@ -14,6 +21,7 @@ Guidelines:
 - Handle errors gracefully with try/except and user-friendly messages
 - Ask for clarification if the request is ambiguous
 - Keep scripts simple and focused on one task
+- Search the web if you need to find APIs, documentation, or solutions
 
 When creating scripts:
 - Use absolute paths
@@ -43,14 +51,21 @@ export async function* runHatch(
       options: {
         resume: sessionId,
         systemPrompt: HATCH_SYSTEM_PROMPT,
-        // Use Claude Code's built-in tools (bash, edit, etc.)
+        // All tools except Notebook tools
         allowedTools: [
           'Bash',
-          'Edit',
           'Read',
           'Write',
+          'Edit',
+          'MultiEdit',
           'Glob',
           'Grep',
+          'LS',
+          'WebSearch',
+          'WebFetch',
+          'TodoRead',
+          'TodoWrite',
+          'Task',
         ],
       },
     });

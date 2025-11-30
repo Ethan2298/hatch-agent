@@ -1,0 +1,377 @@
+"""
+ASCII Art Studio
+An interactive ASCII art generator with custom text, galleries, and more!
+"""
+
+import sys
+import os
+from datetime import datetime
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# ASCII Art Font for text conversion
+ASCII_FONT = {
+    'A': ['  ###  ', ' #   # ', '#     #', '#######', '#     #', '#     #', '#     #'],
+    'B': ['###### ', '#     #', '#     #', '###### ', '#     #', '#     #', '###### '],
+    'C': [' ##### ', '#     #', '#      ', '#      ', '#      ', '#     #', ' ##### '],
+    'D': ['###### ', '#     #', '#     #', '#     #', '#     #', '#     #', '###### '],
+    'E': ['#######', '#      ', '#      ', '####   ', '#      ', '#      ', '#######'],
+    'F': ['#######', '#      ', '#      ', '####   ', '#      ', '#      ', '#      '],
+    'G': [' ##### ', '#     #', '#      ', '#   ###', '#     #', '#     #', ' ##### '],
+    'H': ['#     #', '#     #', '#     #', '#######', '#     #', '#     #', '#     #'],
+    'I': ['#######', '   #   ', '   #   ', '   #   ', '   #   ', '   #   ', '#######'],
+    'J': ['#######', '    #  ', '    #  ', '    #  ', '    #  ', '#   #  ', ' ###   '],
+    'K': ['#     #', '#    # ', '#   #  ', '####   ', '#   #  ', '#    # ', '#     #'],
+    'L': ['#      ', '#      ', '#      ', '#      ', '#      ', '#      ', '#######'],
+    'M': ['#     #', '##   ##', '# # # #', '#  #  #', '#     #', '#     #', '#     #'],
+    'N': ['#     #', '##    #', '# #   #', '#  #  #', '#   # #', '#    ##', '#     #'],
+    'O': [' ##### ', '#     #', '#     #', '#     #', '#     #', '#     #', ' ##### '],
+    'P': ['###### ', '#     #', '#     #', '###### ', '#      ', '#      ', '#      '],
+    'Q': [' ##### ', '#     #', '#     #', '#     #', '#   # #', '#    # ', ' #### #'],
+    'R': ['###### ', '#     #', '#     #', '###### ', '#   #  ', '#    # ', '#     #'],
+    'S': [' ##### ', '#     #', '#      ', ' ##### ', '      #', '#     #', ' ##### '],
+    'T': ['#######', '   #   ', '   #   ', '   #   ', '   #   ', '   #   ', '   #   '],
+    'U': ['#     #', '#     #', '#     #', '#     #', '#     #', '#     #', ' ##### '],
+    'V': ['#     #', '#     #', '#     #', '#     #', '#     #', ' #   # ', '  ###  '],
+    'W': ['#     #', '#     #', '#     #', '#  #  #', '# # # #', '##   ##', '#     #'],
+    'X': ['#     #', ' #   # ', '  # #  ', '   #   ', '  # #  ', ' #   # ', '#     #'],
+    'Y': ['#     #', ' #   # ', '  # #  ', '   #   ', '   #   ', '   #   ', '   #   '],
+    'Z': ['#######', '     # ', '    #  ', '   #   ', '  #    ', ' #     ', '#######'],
+    ' ': ['       ', '       ', '       ', '       ', '       ', '       ', '       '],
+    '!': ['   #   ', '   #   ', '   #   ', '   #   ', '   #   ', '       ', '   #   '],
+}
+
+def clear_screen():
+    """Clear the console screen"""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_header():
+    """Print the main header"""
+    header = """
+    ╔══════════════════════════════════════════════════════════════╗
+    ║                                                              ║
+    ║      █████╗ ███████╗ ██████╗██╗██╗      █████╗ ██████╗      ║
+    ║     ██╔══██╗██╔════╝██╔════╝██║██║     ██╔══██╗██╔══██╗     ║
+    ║     ███████║███████╗██║     ██║██║     ███████║██████╔╝     ║
+    ║     ██╔══██║╚════██║██║     ██║██║     ██╔══██║██╔══██╗     ║
+    ║     ██║  ██║███████║╚██████╗██║██║     ██║  ██║██║  ██║     ║
+    ║     ╚═╝  ╚═╝╚══════╝ ╚═════╝╚═╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝     ║
+    ║                                                              ║
+    ║                    🎨 ART STUDIO 🎨                          ║
+    ║                                                              ║
+    ╚══════════════════════════════════════════════════════════════╝
+    """
+    print(header)
+
+def text_to_ascii(text):
+    """Convert text to ASCII art"""
+    text = text.upper()
+    lines = [''] * 7
+
+    for char in text:
+        if char in ASCII_FONT:
+            for i, line in enumerate(ASCII_FONT[char]):
+                lines[i] += line + '  '
+        else:
+            for i in range(7):
+                lines[i] += '       '
+
+    return '\n'.join(lines)
+
+def print_gallery():
+    """Print a gallery of pre-made ASCII art"""
+    arts = {
+        "1. Rocket Ship": """
+           /\\
+          /  \\
+         |    |
+         |NASA|
+        /|    |\\
+       / |    | \\
+      /  |    |  \\
+     |   |    |   |
+     |___|____|___|
+        /|    |\\
+       / |    | \\
+      /  |    |  \\
+     |___|____|___|
+       /  ||  \\
+      /___||___\\
+         /  \\
+        /____\\
+       /||||||\\
+      /_||||||_\\
+        """,
+        "2. Cat": """
+     /\\_/\\
+    ( o.o )
+     > ^ <
+    /|   |\\
+   (_|   |_)
+        """,
+        "3. Dragon": """
+                         ___====-_  _-====___
+                   _--^^^#####//      \\\\#####^^^--_
+                _-^##########// (    ) \\\\##########^-_
+               -############//  |\\^^/|  \\\\############-
+             _/############//   (@::@)   \\\\############\\_
+            /#############((     \\\\//     ))#############\\
+           -###############\\\\    (oo)    //###############-
+          -#################\\\\  / VV \\  //#################-
+         -###################\\\\/      \//###################-
+        _#/|##########/\\######(   /\\   )######/\\##########|\\#_
+        |/ |#/\\#/\\#/\\/  \\#/\\##\\  |  |  /##/\\#/  \\/\\#/\\#/\\#| \\|
+        `  |/  V  V  `   V  \\#\\| |  | |/#/  V   '  V  V  \\|  '
+           `   `  `      `   / | |  | | \\   '      '  '   '
+        """,
+        "4. Robot": """
+     ___________
+    |  _____  |
+    | | O O | |
+    | |  >  | |
+    | |_____| |
+    |   ___   |
+    |  |___|  |
+    |_________|
+     |  | |  |
+    _|__|_|__|_
+   |___________|
+        """,
+        "5. Heart": """
+    ♥♥♥♥       ♥♥♥♥
+  ♥♥    ♥♥   ♥♥    ♥♥
+ ♥♥      ♥♥ ♥♥      ♥♥
+♥♥        ♥♥♥        ♥♥
+♥♥                   ♥♥
+ ♥♥                 ♥♥
+  ♥♥               ♥♥
+   ♥♥             ♥♥
+    ♥♥           ♥♥
+     ♥♥         ♥♥
+      ♥♥       ♥♥
+       ♥♥     ♥♥
+        ♥♥   ♥♥
+         ♥♥ ♥♥
+          ♥♥♥
+           ♥
+        """,
+        "6. Diamond": """
+        *
+       ***
+      *****
+     *******
+    *********
+   ***********
+  *************
+   ***********
+    *********
+     *******
+      *****
+       ***
+        *
+        """,
+        "7. Computer": """
+     ___________________
+    |  _____________  |
+    | |             | |
+    | | > Hatch_    | |
+    | |             | |
+    | |_____________| |
+    |_________________|
+        _[_______]_
+    ___[___________]___
+   |         [_____] []|
+   |         [_____] []|
+   L___________________J
+        """,
+        "8. Owl": """
+      ,___,
+      [O.O]
+      /)__)
+    --"-"--
+       """,
+    }
+
+    for name, art in arts.items():
+        print(f"\n{'='*60}")
+        print(f"  {name}")
+        print('='*60)
+        print(art)
+
+def save_to_file(content, filename=None):
+    """Save ASCII art to a file"""
+    if filename is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"ascii_art_{timestamp}.txt"
+
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
+        print(f"\n✅ Saved to: {filename}")
+        return True
+    except Exception as e:
+        print(f"\n❌ Error saving file: {e}")
+        return False
+
+def print_menu():
+    """Print the main menu"""
+    menu = """
+    ┌──────────────────────────────────────────────────────────┐
+    │                      MAIN MENU                           │
+    ├──────────────────────────────────────────────────────────┤
+    │  1. 📝 Convert Text to ASCII Art                         │
+    │  2. 🖼️  View ASCII Art Gallery                           │
+    │  3. 🎲 Random ASCII Art                                  │
+    │  4. 💾 Save Last Art to File                             │
+    │  5. ❌ Exit                                               │
+    └──────────────────────────────────────────────────────────┘
+    """
+    print(menu)
+
+def get_random_art():
+    """Get a random piece of ASCII art"""
+    import random
+    arts = [
+        ("Smiley Face", """
+        #####
+      ##     ##
+     #  ^   ^  #
+    #     <     #
+    #   \\___/   #
+     #         #
+      ##     ##
+        #####
+        """),
+        ("Star", """
+           *
+          ***
+         *****
+        *******
+       *********
+        *******
+         *****
+          ***
+           *
+        """),
+        ("Music Note", """
+        ██
+        ██
+        ██
+        ██
+     ██████
+    ████████
+    ████████
+     ██████
+        """),
+        ("Coffee Cup", """
+        )  (
+       (   ) )
+        ) ( (
+      _______)_
+   .-'---------|
+  ( C|/\\/\\/\\/\\/|
+   '-./\\/\\/\\/\\/|
+     '_________'
+      '-------'
+        """),
+    ]
+    return random.choice(arts)
+
+def main():
+    """Main program loop"""
+    last_art = ""
+
+    while True:
+        clear_screen()
+        print_header()
+        print_menu()
+
+        choice = input("\n    👉 Enter your choice (1-5): ").strip()
+
+        if choice == '1':
+            clear_screen()
+            print_header()
+            print("\n    📝 TEXT TO ASCII ART CONVERTER\n")
+            text = input("    Enter text to convert: ").strip()
+
+            if text:
+                print("\n" + "="*60)
+                ascii_art = text_to_ascii(text)
+                print(ascii_art)
+                print("="*60)
+                last_art = f"Text: {text}\n\n{ascii_art}"
+
+                save_now = input("\n    💾 Save this art? (y/n): ").strip().lower()
+                if save_now == 'y':
+                    save_to_file(last_art)
+            else:
+                print("\n    ⚠️  No text entered!")
+
+            input("\n    Press Enter to continue...")
+
+        elif choice == '2':
+            clear_screen()
+            print_header()
+            print("\n    🖼️  ASCII ART GALLERY\n")
+            print_gallery()
+
+            save_choice = input("\n    💾 Save any art? Enter number (1-8) or press Enter to skip: ").strip()
+            if save_choice.isdigit() and 1 <= int(save_choice) <= 8:
+                # Get the selected art and save it
+                print(f"\n    ✅ Selected art #{save_choice}")
+
+            input("\n    Press Enter to continue...")
+
+        elif choice == '3':
+            clear_screen()
+            print_header()
+            print("\n    🎲 RANDOM ASCII ART\n")
+            name, art = get_random_art()
+            print(f"    Generated: {name}\n")
+            print("="*60)
+            print(art)
+            print("="*60)
+            last_art = f"{name}\n\n{art}"
+
+            save_now = input("\n    💾 Save this art? (y/n): ").strip().lower()
+            if save_now == 'y':
+                save_to_file(last_art)
+
+            input("\n    Press Enter to continue...")
+
+        elif choice == '4':
+            if last_art:
+                clear_screen()
+                print_header()
+                filename = input("\n    📁 Enter filename (or press Enter for auto-name): ").strip()
+                if not filename:
+                    filename = None
+                elif not filename.endswith('.txt'):
+                    filename += '.txt'
+                save_to_file(last_art, filename)
+                input("\n    Press Enter to continue...")
+            else:
+                print("\n    ⚠️  No art to save yet! Create some first.")
+                input("\n    Press Enter to continue...")
+
+        elif choice == '5':
+            clear_screen()
+            print_header()
+            goodbye = text_to_ascii("GOODBYE")
+            print("\n" + goodbye)
+            print("\n    👋 Thanks for using ASCII Art Studio!\n")
+            break
+
+        else:
+            print("\n    ❌ Invalid choice! Please enter 1-5.")
+            input("\n    Press Enter to continue...")
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n    👋 Goodbye!\n")
+        sys.exit(0)
