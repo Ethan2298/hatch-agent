@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import TextInput from 'ink-text-input';
 import { runHatch, HatchEvent } from '../agent/hatch.js';
@@ -7,6 +7,7 @@ interface DisplayMessage {
   type: 'user' | 'assistant' | 'tool_use' | 'tool_result' | 'error';
   content: string;
   toolName?: string;
+  isStreaming?: boolean;
 }
 
 export function App() {
@@ -15,19 +16,9 @@ export function App() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [thinkingDots, setThinkingDots] = useState('');
-
-  // Animated thinking indicator
-  useEffect(() => {
-    if (!isProcessing) return;
-    const frames = ['·', '··', '···', '··'];
-    let i = 0;
-    const interval = setInterval(() => {
-      setThinkingDots(frames[i % frames.length]!);
-      i++;
-    }, 300);
-    return () => clearInterval(interval);
-  }, [isProcessing]);
+  const [streamingText, setStreamingText] = useState('');
+  const [currentTool, setCurrentTool] = useState<string | null>(null);
+  const [toolInput, setToolInput] = useState('');
 
   // Handle Ctrl+C
   useInput((inputChar, key) => {
@@ -43,6 +34,9 @@ export function App() {
     setInput('');
     setMessages((prev) => [...prev, { type: 'user', content: userInput }]);
     setIsProcessing(true);
+    setStreamingText('');
+    setCurrentTool(null);
+    setToolInput('');
 
     try {
       for await (const event of runHatch(userInput, sessionId)) {
@@ -51,39 +45,61 @@ export function App() {
             setSessionId(event.sessionId);
             break;
 
-          case 'text':
+          // Real-time text streaming
+          case 'text_delta':
             if (event.text) {
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last && last.type === 'assistant') {
-                  return [
-                    ...prev.slice(0, -1),
-                    { ...last, content: last.content + event.text },
-                  ];
-                }
-                return [...prev, { type: 'assistant', content: event.text! }];
-              });
+              setStreamingText((prev) => prev + event.text);
             }
             break;
 
-          case 'tool_use':
-            setMessages((prev) => [
-              ...prev,
-              {
-                type: 'tool_use',
-                content: formatToolInput(event.toolName!, event.toolInput!),
-                toolName: event.toolName,
-              },
-            ]);
+          // Complete text (flush streaming buffer)
+          case 'text':
+            if (streamingText || event.text) {
+              const finalText = event.text || streamingText;
+              setMessages((prev) => [...prev, { type: 'assistant', content: finalText }]);
+              setStreamingText('');
+            }
             break;
 
+          // Tool starting
+          case 'tool_use_start':
+            // Flush any streaming text first
+            if (streamingText) {
+              setMessages((prev) => [...prev, { type: 'assistant', content: streamingText }]);
+              setStreamingText('');
+            }
+            setCurrentTool(event.toolName || null);
+            setToolInput('');
+            if (event.toolInput) {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  type: 'tool_use',
+                  content: formatToolInput(event.toolName!, event.toolInput!),
+                  toolName: event.toolName,
+                },
+              ]);
+              setCurrentTool(null);
+            }
+            break;
+
+          // Tool input streaming
+          case 'tool_input_delta':
+            if (event.toolInputDelta) {
+              setToolInput((prev) => prev + event.toolInputDelta);
+            }
+            break;
+
+          // Tool result
           case 'tool_result':
+            setCurrentTool(null);
+            setToolInput('');
             if (event.toolResult) {
               setMessages((prev) => [
                 ...prev,
                 {
                   type: 'tool_result',
-                  content: truncate(event.toolResult!, 500),
+                  content: truncate(event.toolResult!, 800),
                 },
               ]);
             }
@@ -97,6 +113,11 @@ export function App() {
             break;
 
           case 'done':
+            // Flush any remaining streaming text
+            if (streamingText) {
+              setMessages((prev) => [...prev, { type: 'assistant', content: streamingText }]);
+              setStreamingText('');
+            }
             if (event.sessionId) {
               setSessionId(event.sessionId);
             }
@@ -114,6 +135,9 @@ export function App() {
     }
 
     setIsProcessing(false);
+    setStreamingText('');
+    setCurrentTool(null);
+    setToolInput('');
   };
 
   return (
@@ -132,10 +156,36 @@ export function App() {
           <MessageDisplay key={i} message={msg} />
         ))}
 
+        {/* Streaming text (real-time) */}
+        {streamingText && (
+          <Box marginBottom={1} flexDirection="column">
+            <Text color="green" bold>
+              Hatch:
+            </Text>
+            <Box marginLeft={2}>
+              <Text>{streamingText}</Text>
+              <Text color="yellow">▊</Text>
+            </Box>
+          </Box>
+        )}
+
+        {/* Tool in progress */}
+        {currentTool && (
+          <Box marginBottom={1} flexDirection="column">
+            <Text color="magenta">⚙️ {currentTool}</Text>
+            {toolInput && (
+              <Box marginLeft={2}>
+                <Text dimColor>{truncate(toolInput, 200)}</Text>
+                <Text color="yellow">▊</Text>
+              </Box>
+            )}
+          </Box>
+        )}
+
         {/* Thinking indicator */}
-        {isProcessing && (
+        {isProcessing && !streamingText && !currentTool && (
           <Box>
-            <Text color="yellow">⚡ Thinking{thinkingDots}</Text>
+            <Text color="yellow">⚡ Thinking...</Text>
           </Box>
         )}
       </Box>
@@ -234,6 +284,21 @@ function formatToolInput(name: string, input: Record<string, unknown>): string {
   }
   if (name === 'Read' || name === 'read') {
     return `read ${input.file_path || input.path || ''}`;
+  }
+  if (name === 'Glob' || name === 'glob') {
+    return `glob ${input.pattern}`;
+  }
+  if (name === 'Grep' || name === 'grep') {
+    return `grep "${input.pattern}"`;
+  }
+  if (name === 'LS' || name === 'ls') {
+    return `ls ${input.path || '.'}`;
+  }
+  if (name === 'WebSearch' || name === 'websearch') {
+    return `search: ${input.query}`;
+  }
+  if (name === 'WebFetch' || name === 'webfetch') {
+    return `fetch: ${input.url}`;
   }
   return JSON.stringify(input, null, 2);
 }

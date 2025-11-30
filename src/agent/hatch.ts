@@ -32,11 +32,13 @@ When creating scripts:
 Current working directory: ${process.cwd()}`;
 
 export interface HatchEvent {
-  type: 'init' | 'text' | 'tool_use' | 'tool_result' | 'done' | 'error';
+  type: 'init' | 'text_delta' | 'text' | 'tool_use_start' | 'tool_input_delta' | 'tool_result' | 'done' | 'error';
   sessionId?: string;
   text?: string;
   toolName?: string;
+  toolId?: string;
   toolInput?: Record<string, unknown>;
+  toolInputDelta?: string;
   toolResult?: string;
   error?: string;
 }
@@ -51,6 +53,8 @@ export async function* runHatch(
       options: {
         resume: sessionId,
         systemPrompt: HATCH_SYSTEM_PROMPT,
+        // Enable streaming for real-time output
+        includePartialMessages: true,
         // All tools except Notebook tools
         allowedTools: [
           'Bash',
@@ -81,32 +85,70 @@ export async function* runHatch(
           }
           break;
 
+        // Streaming events (real-time)
+        case 'stream_event':
+          const event = item.event as any;
+
+          if (event.type === 'content_block_start') {
+            if (event.content_block?.type === 'tool_use') {
+              yield {
+                type: 'tool_use_start',
+                toolName: event.content_block.name,
+                toolId: event.content_block.id,
+              };
+            }
+          }
+
+          if (event.type === 'content_block_delta') {
+            // Text streaming
+            if (event.delta?.type === 'text_delta') {
+              yield { type: 'text_delta', text: event.delta.text };
+            }
+            // Tool input streaming
+            if (event.delta?.type === 'input_json_delta') {
+              yield { type: 'tool_input_delta', toolInputDelta: event.delta.partial_json };
+            }
+          }
+          break;
+
+        // Complete assistant message (after streaming)
         case 'assistant':
           for (const piece of item.message.content) {
             if (piece.type === 'text') {
               yield { type: 'text', text: piece.text };
             } else if (piece.type === 'tool_use') {
               yield {
-                type: 'tool_use',
+                type: 'tool_use_start',
                 toolName: piece.name,
+                toolId: piece.id,
                 toolInput: piece.input as Record<string, unknown>,
               };
             }
           }
           break;
 
+        // Tool results
         case 'user':
           for (const piece of item.message.content) {
             if (piece.type === 'tool_result') {
               let resultText = '';
-              for (const inner of piece.content) {
-                if (inner.type === 'text') {
-                  resultText += inner.text;
+              if (Array.isArray(piece.content)) {
+                for (const inner of piece.content) {
+                  if (inner.type === 'text') {
+                    resultText += inner.text;
+                  }
                 }
+              } else if (typeof piece.content === 'string') {
+                resultText = piece.content;
               }
               yield { type: 'tool_result', toolResult: resultText };
             }
           }
+          break;
+
+        // Result message
+        case 'result':
+          // Session ended
           break;
       }
     }
