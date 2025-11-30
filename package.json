@@ -1,0 +1,26 @@
+{
+  "name": "hatch",
+  "version": "0.1.0",
+  "description": "AI-powered terminal agent that writes Python scripts for you",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "hatch": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.tsx",
+    "build": "bun build src/cli.tsx --outdir dist --target node",
+    "start": "node dist/cli.js"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.2.7",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "ink": "^6.5.1",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.0"
+  }
+}
