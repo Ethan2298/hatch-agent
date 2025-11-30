@@ -2,95 +2,27 @@
 
 ## Overview
 
-Hatch is a terminal-based AI agent that generates and executes Python scripts for non-technical users. The user describes what they want in natural language, the agent writes a `.hatch` script, and optionally runs it.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        USER                                 │
-│         "rename all my photos by date taken"                │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    HATCH AGENT                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │   LLM API   │  │    Tools    │  │  Executor   │         │
-│  │  (Anthropic)│  │ (Bash/File) │  │  (Python)   │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   .hatch FILE                               │
-│              (Python script output)                         │
-└─────────────────────────────────────────────────────────────┘
-```
+Hatch is a terminal-based AI agent that generates and executes Python scripts for non-technical users.
 
 ---
 
-## Core Principles
+## Core Design: 2 Tools Only
 
-1. **Minimal scaffolding** - Let the model do the thinking
-2. **Tool clarity** - Unambiguous tool descriptions, absolute paths
-3. **Iteration built-in** - Run → Error → Fix → Run loop
-4. **User control** - Always ask before executing, show what will happen
+Following the highest-performing agent architecture: **minimal scaffolding, maximum control to the model.**
 
----
+### Tool 1: Bash
 
-## Agent Loop
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     AGENT LOOP                              │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  1. USER INPUT                                              │
-│     ↓                                                       │
-│  2. LLM THINKS (what tools to use?)                        │
-│     ↓                                                       │
-│  3. TOOL CALL (bash, write, read, etc.)                    │
-│     ↓                                                       │
-│  4. TOOL RESULT → back to LLM                              │
-│     ↓                                                       │
-│  5. REPEAT until done or user stops                        │
-│     ↓                                                       │
-│  6. OUTPUT (.hatch file created)                           │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Loop States
-
-| State | Description |
-|-------|-------------|
-| `idle` | Waiting for user input |
-| `thinking` | LLM is processing |
-| `tool_call` | Executing a tool |
-| `awaiting_permission` | Waiting for user to approve action |
-| `complete` | Task finished |
-| `error` | Something went wrong |
-
----
-
-## Tools (Minimal Set)
-
-Following the "2 tools" principle - keep it minimal.
-
-### 1. Bash Tool
-
-Execute shell commands. Used for:
-- Running Python scripts
-- Installing pip packages
-- File system operations
-- System commands
+Execute shell commands with persistent state across calls.
 
 ```typescript
 interface BashTool {
   name: "bash";
-  description: "Execute a shell command. Use for running scripts, installing packages, file operations.";
+  description: `Execute a bash command in a persistent shell session.
+State is persistent across command calls.
+Use this for: running Python scripts, pip install, file system operations, system commands.
+When running multiple commands, use && to chain them.`;
   parameters: {
-    command: string;      // The command to run
-    timeout?: number;     // Max execution time (ms)
+    command: string;
   };
   returns: {
     stdout: string;
@@ -100,175 +32,147 @@ interface BashTool {
 }
 ```
 
-**Permissions:**
-- Always show command before running
-- Require explicit approval for: `rm`, `sudo`, network commands
-- Auto-approve: `python`, `pip install`, `ls`, `cat`, `mkdir`
-
 ---
 
-### 2. Write Tool
+### Tool 2: Edit (str_replace_editor)
 
-Create or overwrite files. Primary tool for generating `.hatch` scripts.
+A single tool for all file operations with 5 commands.
 
 ```typescript
-interface WriteTool {
-  name: "write";
-  description: "Create or overwrite a file. Use absolute paths only.";
+interface EditTool {
+  name: "edit";
+  description: `A tool for viewing, creating, and editing files.
+
+Commands:
+- view: Read file contents
+- create: Create a new file with content
+- str_replace: Replace exact text in a file (must match exactly once)
+- insert: Insert text at a specific line number
+- undo_edit: Undo the last edit to a file
+
+Always use absolute paths.`;
   parameters: {
-    path: string;         // Absolute path to file
-    content: string;      // File content
-  };
-  returns: {
-    success: boolean;
-    path: string;
+    command: "view" | "create" | "str_replace" | "insert" | "undo_edit";
+    path: string;                    // Absolute path (required for all)
+    content?: string;                // For create
+    old_str?: string;                // For str_replace
+    new_str?: string;                // For str_replace
+    insert_line?: number;            // For insert
+    text?: string;                   // For insert
   };
 }
 ```
 
----
+#### Command Details
 
-### 3. Read Tool
-
-Read file contents. Used to understand existing files or check script output.
-
+**view**
 ```typescript
-interface ReadTool {
-  name: "read";
-  description: "Read contents of a file. Use absolute paths only.";
-  parameters: {
-    path: string;         // Absolute path to file
-  };
-  returns: {
-    content: string;
-    exists: boolean;
-  };
-}
+{ command: "view", path: "/absolute/path/to/file.py" }
+// Returns: file contents with line numbers
 ```
 
----
-
-### 4. Ask Tool
-
-Ask user for clarification or choices.
-
+**create**
 ```typescript
-interface AskTool {
-  name: "ask";
-  description: "Ask the user a question when you need more information.";
-  parameters: {
-    question: string;
-    options?: string[];   // Optional multiple choice
-  };
-  returns: {
-    answer: string;
-  };
+{ command: "create", path: "/absolute/path/to/file.hatch", content: "#!/usr/bin/env python3\n..." }
+// Returns: success confirmation
+```
+
+**str_replace**
+```typescript
+{
+  command: "str_replace",
+  path: "/absolute/path/to/file.py",
+  old_str: "def old_function():",
+  new_str: "def new_function():"
 }
+// Returns: success or error if old_str not found exactly once
+```
+
+**insert**
+```typescript
+{
+  command: "insert",
+  path: "/absolute/path/to/file.py",
+  insert_line: 10,
+  text: "# This line inserted at line 10"
+}
+// Returns: success confirmation
+```
+
+**undo_edit**
+```typescript
+{ command: "undo_edit", path: "/absolute/path/to/file.py" }
+// Returns: reverts last edit, shows diff
 ```
 
 ---
 
-## .hatch File Format
+## Design Principles
 
-A `.hatch` file is just a Python script with a special header:
+1. **Give control to the model** - Don't over-engineer the scaffold
+2. **Tool descriptions matter** - Invest heavily in clear, unambiguous specs
+3. **Require absolute paths** - Eliminates relative path confusion
+4. **Strict string matching** - Exactly one match required for str_replace
+5. **Persistent state** - Bash state carries across calls
 
-```python
-#!/usr/bin/env python3
-"""
-Hatch Script: Rename photos by date
-Created: 2024-11-29
-Description: Renames all photos in a folder using their EXIF date taken
-"""
+---
 
-import os
-from PIL import Image
-from PIL.ExifTags import TAGS
-from datetime import datetime
+## Agent Loop
 
-def main():
-    # Script logic here
-    pass
-
-if __name__ == "__main__":
-    main()
+```
+┌──────────────────────────────────────────┐
+│              AGENT LOOP                  │
+├──────────────────────────────────────────┤
+│                                          │
+│  1. User message                         │
+│     ↓                                    │
+│  2. Send to LLM with tool definitions    │
+│     ↓                                    │
+│  3. LLM responds with:                   │
+│     - Text (show to user)                │
+│     - Tool call (execute it)             │
+│     ↓                                    │
+│  4. If tool call:                        │
+│     - Execute tool                       │
+│     - Send result back to LLM            │
+│     - Go to step 3                       │
+│     ↓                                    │
+│  5. If no tool call: done                │
+│                                          │
+└──────────────────────────────────────────┘
 ```
 
-**Conventions:**
-- Always executable (`#!/usr/bin/env python3`)
-- Docstring with name, date, description
-- `main()` function as entry point
-- Handle errors gracefully with user-friendly messages
+The loop continues until the model stops calling tools.
 
 ---
 
 ## System Prompt
 
 ```
-You are Hatch, an AI assistant that creates Python scripts for users.
+You are Hatch, an AI that creates Python scripts for users who don't know how to code.
 
-Your job is to:
-1. Understand what the user wants to accomplish
-2. Write a Python script (.hatch file) that does it
-3. Help them run it and fix any issues
+You have two tools:
+1. bash - Run shell commands (python, pip, ls, etc.)
+2. edit - View, create, and edit files
 
-Guidelines:
-- Write single-file Python scripts
-- Use standard library when possible, pip install if needed
-- Always include error handling with helpful messages
-- Ask clarifying questions if the request is ambiguous
-- Show the user what you're about to do before doing it
+Your workflow:
+1. Understand what the user wants
+2. Create a .hatch file (Python script) using edit command: create
+3. Run it with bash command: python /path/to/script.hatch
+4. If it fails, use edit command: str_replace to fix it
+5. Repeat until it works
 
-Tools available:
-- bash: Run shell commands
-- write: Create/edit files
-- read: Read file contents
-- ask: Ask user questions
+Rules:
+- Always use absolute paths
+- Create scripts in the user's current directory or ~/hatch-scripts/
+- Include helpful print() statements so users see progress
+- Handle errors gracefully
+- Ask for clarification if the request is ambiguous
 
-When writing scripts:
-- Use absolute paths
-- Include a docstring header
-- Wrap in main() function
-- Print helpful output so user knows what's happening
-```
-
----
-
-## UI Components (Ink/React)
-
-### Main Screen Layout
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 🥚 Hatch                                           v0.1.0   │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│ 💬 Conversation history...                                  │
-│                                                             │
-│ > User message                                              │
-│ 🤖 Assistant response                                       │
-│                                                             │
-│ ┌─────────────────────────────────────────────────────────┐ │
-│ │ 📄 script.hatch                                         │ │
-│ │ ```python                                               │ │
-│ │ # Generated code preview                                │ │
-│ │ ```                                                     │ │
-│ └─────────────────────────────────────────────────────────┘ │
-│                                                             │
-├─────────────────────────────────────────────────────────────┤
-│ > Type your message...                              [Enter] │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Permission Prompt
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ ⚠️  Hatch wants to run a command:                           │
-│                                                             │
-│   python /Users/ethan/scripts/rename_photos.hatch           │
-│                                                             │
-│   [Y] Run   [N] Cancel   [E] Edit first                     │
-└─────────────────────────────────────────────────────────────┘
+When editing files:
+- str_replace requires the old_str to match EXACTLY once
+- Include enough context in old_str to make it unique
+- Use view first if you need to see the current file contents
 ```
 
 ---
@@ -278,88 +182,96 @@ When writing scripts:
 ```
 hatch/
 ├── src/
-│   ├── cli.tsx              # Entry point
+│   ├── cli.tsx                 # Entry point
 │   ├── components/
-│   │   ├── App.tsx          # Main app shell
-│   │   ├── Chat.tsx         # Conversation view
-│   │   ├── CodePreview.tsx  # Script preview
-│   │   ├── Input.tsx        # User input
-│   │   └── Permission.tsx   # Permission prompts
+│   │   ├── App.tsx             # Main app shell
+│   │   ├── Chat.tsx            # Conversation display
+│   │   ├── Input.tsx           # User input
+│   │   └── ToolOutput.tsx      # Tool execution display
 │   ├── agent/
-│   │   ├── loop.ts          # Agent loop logic
-│   │   ├── tools.ts         # Tool definitions
-│   │   └── llm.ts           # Anthropic API calls
-│   ├── tools/
-│   │   ├── bash.ts          # Bash tool implementation
-│   │   ├── read.ts          # Read tool implementation
-│   │   ├── write.ts         # Write tool implementation
-│   │   └── ask.ts           # Ask tool implementation
-│   └── utils/
-│       ├── config.ts        # User config
-│       └── paths.ts         # Path utilities
+│   │   ├── loop.ts             # The agent loop
+│   │   └── llm.ts              # Anthropic API client
+│   └── tools/
+│       ├── index.ts            # Tool definitions for LLM
+│       ├── bash.ts             # Bash implementation
+│       └── edit.ts             # Edit implementation (view/create/str_replace/insert/undo)
 ├── docs/
-│   └── ARCHITECTURE.md      # This file
+│   └── ARCHITECTURE.md
 ├── package.json
-├── tsconfig.json
-└── bun.lock
+└── tsconfig.json
 ```
 
 ---
 
-## Configuration
+## Tool Implementation Details
 
-User config stored in `~/.hatchrc` or `~/.config/hatch/config.json`:
+### Bash Tool
 
-```json
-{
-  "apiKey": "sk-ant-...",
-  "model": "claude-sonnet-4-20250514",
-  "scriptsDir": "~/hatch-scripts",
-  "autoApprove": ["pip install", "python"],
-  "theme": "dark"
+```typescript
+// tools/bash.ts
+import { spawn } from 'child_process';
+
+let shellProcess: ChildProcess | null = null;
+
+export async function executeBash(command: string): Promise<{
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+}> {
+  // Persistent shell - state carries across calls
+  // On Windows: use powershell
+  // On Mac/Linux: use bash
+}
+```
+
+### Edit Tool
+
+```typescript
+// tools/edit.ts
+const fileHistory: Map<string, string[]> = new Map(); // For undo
+
+export async function executeEdit(params: EditParams): Promise<string> {
+  switch (params.command) {
+    case 'view':
+      return viewFile(params.path);
+    case 'create':
+      return createFile(params.path, params.content);
+    case 'str_replace':
+      return strReplace(params.path, params.old_str, params.new_str);
+    case 'insert':
+      return insertLine(params.path, params.insert_line, params.text);
+    case 'undo_edit':
+      return undoEdit(params.path);
+  }
+}
+
+function strReplace(path: string, oldStr: string, newStr: string): string {
+  const content = readFileSync(path, 'utf-8');
+  const matches = content.split(oldStr).length - 1;
+
+  if (matches === 0) {
+    throw new Error(`old_str not found in ${path}`);
+  }
+  if (matches > 1) {
+    throw new Error(`old_str found ${matches} times, must be unique`);
+  }
+
+  // Save to history for undo
+  saveHistory(path, content);
+
+  const newContent = content.replace(oldStr, newStr);
+  writeFileSync(path, newContent);
+  return `Successfully replaced in ${path}`;
 }
 ```
 
 ---
 
-## Error Handling & Iteration
+## MVP Checklist
 
-When a script fails:
-
-1. **Capture error** - Full stderr/traceback
-2. **Send to LLM** - "The script failed with this error: ..."
-3. **LLM fixes** - Generates updated script
-4. **User approves** - Shows diff, user confirms
-5. **Retry** - Run again
-
-Max iterations: 3 (then ask user what to do)
-
----
-
-## Security Considerations
-
-1. **No auto-run** - Always ask before executing
-2. **Sandboxing** - Consider running scripts in temp directory
-3. **API key storage** - Use system keychain if possible
-4. **Network commands** - Extra confirmation for curl, wget, etc.
-5. **Destructive commands** - Block `rm -rf /`, `sudo rm`, etc.
-
----
-
-## MVP Scope (v0.1)
-
-**In scope:**
-- [ ] Basic agent loop (input → LLM → tool → output)
-- [ ] 4 tools: bash, write, read, ask
-- [ ] Simple chat UI
-- [ ] Code preview
-- [ ] Permission prompts
-- [ ] .hatch file generation
-- [ ] Run scripts with Python
-
-**Out of scope (later):**
-- Web search
-- Multi-file projects
-- GUI apps
-- Scheduling/cron
-- Package management beyond pip
+- [ ] Agent loop (user → LLM → tool → LLM → ...)
+- [ ] Bash tool with persistent state
+- [ ] Edit tool with 5 commands (view, create, str_replace, insert, undo_edit)
+- [ ] Streaming responses in terminal
+- [ ] Tool execution display
+- [ ] Basic error handling
